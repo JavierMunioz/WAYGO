@@ -15,6 +15,7 @@ class PhotoResponse(BaseSchema):
     caption: str | None = None
     likes_count: int
     comments_count: int
+    is_liked: bool = False
     created_at: datetime
 
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from app.core.constants import PlaceCategory
 from app.dependencies.auth import CurrentUser, OptionalUser, SuperUser
 from app.dependencies.pagination import PaginationParams
-from app.repositories.photo_repository import PhotoRepository
+from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.visit_repository import VisitRepository
 from app.schemas.photo import PhotoResponse
@@ -115,16 +115,21 @@ async def get_place(place_id: str, current_user: OptionalUser):
 @router.get("/{place_id}/photos", response_model=list[PhotoResponse])
 async def get_place_photos(
     place_id: str,
+    current_user: OptionalUser,
     pagination: PaginationParams = Depends(),
 ):
-    repo = PhotoRepository()
-    photos = await repo.get_place_photos(
+    photo_repo = PhotoRepository()
+    like_repo = PhotoLikeRepository()
+    photos = await photo_repo.get_place_photos(
         place_id=place_id,
         skip=(pagination.page - 1) * pagination.page_size,
         limit=pagination.page_size,
     )
-    return [
-        PhotoResponse(
+    user_id = str(current_user.id) if current_user else None
+    result = []
+    for p in photos:
+        is_liked = await like_repo.has_liked(user_id, str(p.id)) if user_id else False
+        result.append(PhotoResponse(
             id=str(p.id),
             user_id=p.user_id,
             place_id=p.place_id,
@@ -133,10 +138,10 @@ async def get_place_photos(
             caption=p.caption,
             likes_count=p.likes_count,
             comments_count=p.comments_count,
+            is_liked=is_liked,
             created_at=p.created_at,
-        )
-        for p in photos
-    ]
+        ))
+    return result
 
 
 @router.patch("/{place_id}", response_model=PlaceResponse)

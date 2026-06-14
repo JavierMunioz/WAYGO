@@ -90,14 +90,17 @@ class PhotoLikeRepository(BaseRepository[PhotoLike]):
     model = PhotoLike
 
     async def get_like(self, user_id: str, photo_id: str) -> PhotoLike | None:
+        """Returns any like record (active or inactive) — used to check history."""
         return await PhotoLike.find_one(PhotoLike.user_id == user_id, PhotoLike.photo_id == photo_id)
 
     async def has_liked(self, user_id: str, photo_id: str) -> bool:
-        return await self.get_like(user_id, photo_id) is not None
+        """Returns True only if the current active like exists."""
+        like = await self.get_like(user_id, photo_id)
+        return like is not None and like.is_active
 
     async def get_photo_likers(self, photo_id: str, skip: int = 0, limit: int = 20) -> list[PhotoLike]:
         return (
-            await PhotoLike.find(PhotoLike.photo_id == photo_id)
+            await PhotoLike.find(PhotoLike.photo_id == photo_id, PhotoLike.is_active == True)
             .sort(-PhotoLike.created_at)
             .skip(skip)
             .limit(limit)

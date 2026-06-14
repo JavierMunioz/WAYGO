@@ -32,25 +32,35 @@ class LikeService:
         if await self._like_repo.has_liked(user_id, photo_id):
             raise AlreadyExistsError("Already liked this photo")
 
-        like = PhotoLike(user_id=user_id, photo_id=photo_id)
-        await like.save()
+        existing = await self._like_repo.get_like(user_id, photo_id)
+        first_time = existing is None
+
+        if existing:
+            # Re-like after unlike: reactivate, never award points again
+            existing.is_active = True
+            await existing.save()
+        else:
+            await PhotoLike(user_id=user_id, photo_id=photo_id).save()
 
         await self._photo_repo.increment_likes(photo_id, 1)
         await self._user_repo.increment_counter(photo.user_id, "likes_received_count")
         if self._place_repo:
             await self._place_repo.increment_counter(photo.place_id, "total_likes")
 
-        # Points and notification only for likes on other users' photos
-        if photo.user_id != user_id:
+        # Points and notification only on the very first like ever
+        if first_time and photo.user_id != user_id:
             await self._points_svc.award_like_received(photo.user_id)
             await self._notification_svc.notify_photo_like(photo.user_id, liker_username, photo_id)
 
     async def unlike_photo(self, user_id: str, photo_id: str) -> None:
         like = await self._like_repo.get_like(user_id, photo_id)
-        if not like:
+        if not like or not like.is_active:
             raise NotFoundError("Like not found")
 
-        await like.delete()
+        # Soft delete: preserve the record so points are never re-awarded
+        like.is_active = False
+        await like.save()
+
         photo = await self._photo_repo.get_by_id(photo_id)
         await self._photo_repo.increment_likes(photo_id, -1)
         await self._user_repo.increment_counter(photo.user_id, "likes_received_count", amount=-1)

@@ -30,6 +30,12 @@ async def create_place(data: CreatePlaceRequest, current_user: SuperUser):
     return _to_response(place)
 
 
+@router.delete("/{place_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_place(place_id: str, current_user: SuperUser):
+    svc = _get_place_service()
+    await svc.delete_place(place_id)
+
+
 @router.post("/{place_id}/cover-image", response_model=PlaceResponse)
 async def upload_place_cover(
     place_id: str,

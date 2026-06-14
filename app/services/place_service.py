@@ -77,6 +77,10 @@ class PlaceService:
         skip = compute_skip(page, page_size)
         return await self._repo.search_text(query, skip=skip, limit=page_size)
 
+    async def delete_place(self, place_id: str) -> None:
+        place = await self._repo.get_by_id(place_id)
+        await place.delete()
+
     async def upload_cover_image(self, place_id: str, content: bytes, content_type: str) -> Place:
         if content_type not in ALLOWED_IMAGE_TYPES:
             raise StorageError(f"Tipo de imagen no soportado: {content_type}")

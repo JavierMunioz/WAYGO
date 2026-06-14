@@ -1,0 +1,41 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+httptools==0.6.4
+uvloop==0.21.0
+
+# Database
+motor==3.7.0
+beanie==1.27.0
+pymongo[srv]==4.10.1
+
+# Redis
+redis==5.2.0
+
+# File uploads
+python-multipart==0.0.12
+
+# Auth
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.0
+passlib==1.7.4
+
+# Config
+pydantic==2.9.2
+pydantic-settings==2.6.1
+pydantic[email]
+
+# HTTP client (for tests)
+httpx==0.28.0
+
+# Storage (optional S3 support)
+boto3==1.35.67
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+
+# Code quality
+ruff==0.8.1
+mypy==1.13.0

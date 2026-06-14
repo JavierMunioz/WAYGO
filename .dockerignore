@@ -1,0 +1,35 @@
+# Secrets — never bake into image; pass via Docker Compose env_file / environment
+.env
+.env.*
+!.env.example
+
+# Dev tooling
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.tox/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Git
+.git/
+.gitignore
+
+# Docs
+*.md
+docs/
+
+# OS
+.DS_Store
+Thumbs.db

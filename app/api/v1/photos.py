@@ -34,6 +34,7 @@ def _get_like_service() -> LikeService:
         user_repo=UserRepository(),
         points_svc=PointsService(UserRepository(), StatsRepository()),
         notification_svc=NotificationService(NotificationRepository()),
+        place_repo=PlaceRepository(),
     )
 
 

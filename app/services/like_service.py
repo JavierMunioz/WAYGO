@@ -1,6 +1,7 @@
 from app.core.exceptions import AlreadyExistsError, NotFoundError
 from app.models.photo import PhotoLike
 from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository
+from app.repositories.place_repository import PlaceRepository
 from app.repositories.user_repository import UserRepository
 from app.services.notification_service import NotificationService
 from app.services.points_service import PointsService
@@ -14,12 +15,14 @@ class LikeService:
         user_repo: UserRepository,
         points_svc: PointsService,
         notification_svc: NotificationService,
+        place_repo: PlaceRepository | None = None,
     ):
         self._like_repo = like_repo
         self._photo_repo = photo_repo
         self._user_repo = user_repo
         self._points_svc = points_svc
         self._notification_svc = notification_svc
+        self._place_repo = place_repo
 
     async def like_photo(self, user_id: str, photo_id: str, liker_username: str) -> None:
         photo = await self._photo_repo.get_by_id(photo_id)
@@ -34,6 +37,8 @@ class LikeService:
 
         await self._photo_repo.increment_likes(photo_id, 1)
         await self._user_repo.increment_counter(photo.user_id, "likes_received_count")
+        if self._place_repo:
+            await self._place_repo.increment_counter(photo.place_id, "total_likes")
 
         # Points and notification only for likes on other users' photos
         if photo.user_id != user_id:
@@ -46,10 +51,11 @@ class LikeService:
             raise NotFoundError("Like not found")
 
         await like.delete()
-        await self._photo_repo.increment_likes(photo_id, -1)
-
         photo = await self._photo_repo.get_by_id(photo_id)
+        await self._photo_repo.increment_likes(photo_id, -1)
         await self._user_repo.increment_counter(photo.user_id, "likes_received_count", amount=-1)
+        if self._place_repo:
+            await self._place_repo.increment_counter(photo.place_id, "total_likes", amount=-1)
 
     async def has_liked(self, user_id: str, photo_id: str) -> bool:
         return await self._like_repo.has_liked(user_id, photo_id)

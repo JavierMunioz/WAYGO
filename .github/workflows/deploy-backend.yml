@@ -33,7 +33,13 @@ jobs:
               git reset --hard origin/main
             else
               echo "==> First deploy — cloning repository..."
+              [ -f "$DEPLOY_DIR/backend/.env" ] && cp "$DEPLOY_DIR/backend/.env" /tmp/waygo_env_backup
+              rm -rf "$DEPLOY_DIR"
               git clone --depth=1 "$REPO_URL" "$DEPLOY_DIR"
+              if [ -f /tmp/waygo_env_backup ]; then
+                mkdir -p "$DEPLOY_DIR/backend"
+                mv /tmp/waygo_env_backup "$DEPLOY_DIR/backend/.env"
+              fi
             fi
             echo "==> Repository ready."
 

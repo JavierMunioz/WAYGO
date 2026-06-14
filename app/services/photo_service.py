@@ -1,8 +1,5 @@
-import uuid
-from pathlib import Path
-
-from app.core.config import settings
 from app.core.exceptions import ForbiddenError, NotFoundError, StorageError
+from app.utils.storage import store_file
 from app.models.photo import Photo
 from app.repositories.photo_repository import PhotoRepository
 from app.repositories.place_repository import PlaceRepository
@@ -45,7 +42,7 @@ class PhotoService:
         if not visit.verified:
             raise ForbiddenError("Only verified visits can have photos")
 
-        image_url = await self._store_file(file_content, content_type)
+        image_url = await store_file(file_content, content_type)
 
         photo = Photo(
             user_id=user_id,
@@ -83,32 +80,3 @@ class PhotoService:
         skip = compute_skip(page, page_size)
         return await self._photo_repo.get_place_photos(place_id, skip=skip, limit=page_size)
 
-    async def _store_file(self, content: bytes, content_type: str) -> str:
-        ext = content_type.split("/")[-1].replace("jpeg", "jpg")
-        filename = f"{uuid.uuid4()}.{ext}"
-
-        if settings.STORAGE_PROVIDER == "local":
-            media_path = Path(settings.LOCAL_MEDIA_PATH)
-            media_path.mkdir(parents=True, exist_ok=True)
-            file_path = media_path / filename
-            file_path.write_bytes(content)
-            return f"{settings.STORAGE_CDN_URL}/{filename}"
-
-        # S3 / Cloudflare R2 (boto3)
-        try:
-            import boto3
-            client = boto3.client(
-                "s3",
-                region_name=settings.STORAGE_REGION,
-                aws_access_key_id=settings.STORAGE_ACCESS_KEY,
-                aws_secret_access_key=settings.STORAGE_SECRET_KEY,
-            )
-            client.put_object(
-                Bucket=settings.STORAGE_BUCKET,
-                Key=f"photos/{filename}",
-                Body=content,
-                ContentType=content_type,
-            )
-            return f"{settings.STORAGE_CDN_URL}/photos/{filename}"
-        except Exception as e:
-            raise StorageError(str(e))

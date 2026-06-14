@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.core.constants import PlaceCategory
 from app.dependencies.auth import CurrentUser, OptionalUser, SuperUser
@@ -27,6 +27,18 @@ def _get_place_service() -> PlaceService:
 async def create_place(data: CreatePlaceRequest, current_user: SuperUser):
     svc = _get_place_service()
     place = await svc.create_place(data)
+    return _to_response(place)
+
+
+@router.post("/{place_id}/cover-image", response_model=PlaceResponse)
+async def upload_place_cover(
+    place_id: str,
+    current_user: SuperUser,
+    file: UploadFile = File(...),
+):
+    svc = _get_place_service()
+    content = await file.read()
+    place = await svc.upload_cover_image(place_id, content, file.content_type or "image/jpeg")
     return _to_response(place)
 
 

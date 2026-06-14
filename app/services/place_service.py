@@ -1,10 +1,11 @@
 from app.core.config import settings
-from app.core.constants import PlaceCategory
-from app.core.exceptions import AlreadyExistsError, NotFoundError
+from app.core.constants import ALLOWED_IMAGE_TYPES, MAX_PHOTO_SIZE_MB, PlaceCategory
+from app.core.exceptions import AlreadyExistsError, NotFoundError, StorageError
 from app.models.place import Place
 from app.repositories.place_repository import PlaceRepository
 from app.schemas.place import CreatePlaceRequest, UpdatePlaceRequest
 from app.utils.slug import slugify
+from app.utils.storage import store_file
 
 
 class PlaceService:
@@ -75,6 +76,17 @@ class PlaceService:
         from app.utils.pagination import compute_skip
         skip = compute_skip(page, page_size)
         return await self._repo.search_text(query, skip=skip, limit=page_size)
+
+    async def upload_cover_image(self, place_id: str, content: bytes, content_type: str) -> Place:
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            raise StorageError(f"Tipo de imagen no soportado: {content_type}")
+        if len(content) > MAX_PHOTO_SIZE_MB * 1024 * 1024:
+            raise StorageError(f"La imagen supera el límite de {MAX_PHOTO_SIZE_MB}MB")
+        url = await store_file(content, content_type)
+        place = await self._repo.get_by_id(place_id)
+        place.cover_image = url
+        await place.save()
+        return place
 
     async def list_by_city(self, city: str, page: int, page_size: int) -> list[Place]:
         from app.utils.pagination import compute_skip

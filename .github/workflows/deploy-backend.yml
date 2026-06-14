@@ -33,13 +33,10 @@ jobs:
               git reset --hard origin/main
             else
               echo "==> First deploy — cloning repository..."
-              [ -f "$DEPLOY_DIR/backend/.env" ] && cp "$DEPLOY_DIR/backend/.env" /tmp/waygo_env_backup
+              [ -f "$DEPLOY_DIR/.env" ] && cp "$DEPLOY_DIR/.env" /tmp/waygo_env_backup
               rm -rf "$DEPLOY_DIR"
               git clone --depth=1 "$REPO_URL" "$DEPLOY_DIR"
-              if [ -f /tmp/waygo_env_backup ]; then
-                mkdir -p "$DEPLOY_DIR/backend"
-                mv /tmp/waygo_env_backup "$DEPLOY_DIR/backend/.env"
-              fi
+              [ -f /tmp/waygo_env_backup ] && mv /tmp/waygo_env_backup "$DEPLOY_DIR/.env"
             fi
             echo "==> Repository ready."
 
@@ -56,10 +53,10 @@ jobs:
             echo "==> Updating Python virtual environment..."
             python3 -m venv "$DEPLOY_DIR/venv"
             "$DEPLOY_DIR/venv/bin/pip" install --upgrade pip -q
-            "$DEPLOY_DIR/venv/bin/pip" install -r "$DEPLOY_DIR/backend/requirements.txt" -q
+            "$DEPLOY_DIR/venv/bin/pip" install -r "$DEPLOY_DIR/requirements.txt" -q
 
             echo "==> Ensuring media directory exists..."
-            mkdir -p "$DEPLOY_DIR/backend/media"
+            mkdir -p "$DEPLOY_DIR/media"
 
             echo "==> Restarting PM2 process api_waygo..."
             pm2 stop api_waygo 2>/dev/null || true
@@ -67,7 +64,7 @@ jobs:
             pm2 start "$DEPLOY_DIR/venv/bin/uvicorn" \
               --name api_waygo \
               --interpreter none \
-              --cwd "$DEPLOY_DIR/backend" \
+              --cwd "$DEPLOY_DIR" \
               -- app.main:app --host 0.0.0.0 --port 8888 --workers 2
             pm2 save
             pm2 status

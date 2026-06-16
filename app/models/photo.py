@@ -29,3 +29,12 @@ class PhotoLike(Document):
 
     class Settings:
         name = "photo_likes"
+
+
+class PhotoSave(Document):
+    user_id: str
+    photo_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    class Settings:
+        name = "photo_saves"

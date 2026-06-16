@@ -1,7 +1,7 @@
 from bson import ObjectId
 from beanie.operators import Inc
 
-from app.models.photo import Photo, PhotoLike
+from app.models.photo import Photo, PhotoLike, PhotoSave
 from app.repositories.base import BaseRepository
 
 
@@ -106,3 +106,30 @@ class PhotoLikeRepository(BaseRepository[PhotoLike]):
             .limit(limit)
             .to_list()
         )
+
+
+class PhotoSaveRepository(BaseRepository[PhotoSave]):
+    model = PhotoSave
+
+    async def has_saved(self, user_id: str, photo_id: str) -> bool:
+        return await PhotoSave.find_one(
+            PhotoSave.user_id == user_id, PhotoSave.photo_id == photo_id
+        ) is not None
+
+    async def save(self, user_id: str, photo_id: str) -> None:
+        if not await self.has_saved(user_id, photo_id):
+            await PhotoSave(user_id=user_id, photo_id=photo_id).insert()
+
+    async def unsave(self, user_id: str, photo_id: str) -> None:
+        doc = await PhotoSave.find_one(
+            PhotoSave.user_id == user_id, PhotoSave.photo_id == photo_id
+        )
+        if doc:
+            await doc.delete()
+
+    async def get_saved_ids(self, user_id: str, photo_ids: list[str]) -> set[str]:
+        docs = await PhotoSave.find(
+            PhotoSave.user_id == user_id,
+            {"photo_id": {"$in": photo_ids}},
+        ).to_list()
+        return {d.photo_id for d in docs}

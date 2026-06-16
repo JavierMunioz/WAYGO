@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from app.dependencies.auth import CurrentUser
 from app.dependencies.pagination import PaginationParams
 from app.repositories.notification_repository import NotificationRepository
-from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository
+from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository, PhotoSaveRepository
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.stats_repository import StatsRepository
 from app.repositories.user_repository import UserRepository
@@ -97,6 +97,16 @@ async def get_photo_likes(photo_id: str, pagination: PaginationParams = Depends(
         except Exception:
             pass
     return result
+
+
+@router.post("/{photo_id}/save", status_code=status.HTTP_204_NO_CONTENT)
+async def save_photo(photo_id: str, current_user: CurrentUser):
+    await PhotoSaveRepository().save(str(current_user.id), photo_id)
+
+
+@router.delete("/{photo_id}/save", status_code=status.HTTP_204_NO_CONTENT)
+async def unsave_photo(photo_id: str, current_user: CurrentUser):
+    await PhotoSaveRepository().unsave(str(current_user.id), photo_id)
 
 
 def _to_response(photo) -> PhotoResponse:

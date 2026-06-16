@@ -1,6 +1,6 @@
 from app.core.constants import FeedMode
 from app.repositories.follow_repository import FollowRepository
-from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository
+from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository, PhotoSaveRepository
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.photo import FeedItemResponse
@@ -13,12 +13,14 @@ class FeedService:
         self,
         photo_repo: PhotoRepository,
         like_repo: PhotoLikeRepository,
+        save_repo: PhotoSaveRepository,
         user_repo: UserRepository,
         place_repo: PlaceRepository,
         follow_repo: FollowRepository,
     ):
         self._photo_repo = photo_repo
         self._like_repo = like_repo
+        self._save_repo = save_repo
         self._user_repo = user_repo
         self._place_repo = place_repo
         self._follow_repo = follow_repo
@@ -91,11 +93,13 @@ class FeedService:
             except Exception:
                 pass
 
-        # Batch check likes
+        # Batch check likes and saves
         liked_set: set[str] = set()
         for photo_id in photo_ids:
             if await self._like_repo.has_liked(current_user_id, photo_id):
                 liked_set.add(photo_id)
+
+        saved_set = await self._save_repo.get_saved_ids(current_user_id, photo_ids)
 
         result = []
         for photo_d in photo_dicts:
@@ -123,6 +127,7 @@ class FeedService:
                     place_city=place.city,
                     place_id=str(place.id),
                     user_has_liked=photo_id in liked_set,
+                    is_saved=photo_id in saved_set,
                 )
             )
 

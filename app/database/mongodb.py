@@ -79,6 +79,10 @@ async def _create_indexes() -> None:
     await db.photo_likes.create_index([("user_id", ASCENDING), ("photo_id", ASCENDING)], unique=True)
     await db.photo_likes.create_index([("photo_id", ASCENDING)])
 
+    # Photo Saves
+    await db.photo_saves.create_index([("user_id", ASCENDING), ("photo_id", ASCENDING)], unique=True)
+    await db.photo_saves.create_index([("user_id", ASCENDING)])
+
     # Follows
     await db.follows.create_index([("follower_id", ASCENDING), ("following_id", ASCENDING)], unique=True)
     await db.follows.create_index([("follower_id", ASCENDING)])

@@ -4,7 +4,7 @@ from app.core.constants import FeedMode
 from app.dependencies.auth import CurrentUser, OptionalUser
 from app.dependencies.pagination import PaginationParams
 from app.repositories.follow_repository import FollowRepository
-from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository
+from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository, PhotoSaveRepository
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.photo import FeedItemResponse
@@ -17,6 +17,7 @@ def _get_feed_service() -> FeedService:
     return FeedService(
         photo_repo=PhotoRepository(),
         like_repo=PhotoLikeRepository(),
+        save_repo=PhotoSaveRepository(),
         user_repo=UserRepository(),
         place_repo=PlaceRepository(),
         follow_repo=FollowRepository(),

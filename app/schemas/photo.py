@@ -37,3 +37,4 @@ class FeedItemResponse(BaseSchema):
     place_city: str
     place_id: str
     user_has_liked: bool = False
+    is_saved: bool = False

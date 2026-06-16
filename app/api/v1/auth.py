@@ -88,6 +88,18 @@ async def verify_email_otp(data: VerifyEmailOTPRequest):
     return MessageResponse(message="Email verificado correctamente")
 
 
+@router.post("/resend-verification", response_model=MessageResponse)
+async def resend_verification(data: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    """Resend email verification OTP. Reuses ForgotPasswordRequest (only needs email)."""
+    svc = _get_auth_service()
+    user = await UserRepository().get_by_email(data.email)
+    if user and not user.is_email_verified:
+        code = await svc.generate_email_verification_otp(data.email)
+        background_tasks.add_task(send_verification_email, data.email, code)
+    # Always return 200 — don't reveal whether the email exists or is already verified
+    return MessageResponse(message="Si ese correo existe y no está verificado, recibirás un nuevo código")
+
+
 @router.post("/reset-password-otp", response_model=MessageResponse)
 async def reset_password_otp(data: ResetPasswordOTPRequest):
     svc = _get_auth_service()

@@ -64,9 +64,8 @@ class AuthService:
             raise InvalidCredentialsError()
         if not user.is_active:
             raise InvalidCredentialsError("Account is disabled")
-        # Soft enforcement — warn but don't block MVP; flip to strict in production
-        # if not user.is_email_verified:
-        #     raise EmailNotVerifiedError()
+        if not user.is_email_verified:
+            raise EmailNotVerifiedError()
 
         return await self._issue_token_pair(str(user.id))
 

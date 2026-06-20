@@ -189,9 +189,24 @@ async def admin_get_requirements(badge_id: str, current_user: SuperUser):
 
 
 async def _backfill_badge_for_existing_users(badge_id: str, place_ids: list[str]) -> None:
-    """Award badge to users who already visited all required places."""
+    """Award badge + points + notification to users who already qualify."""
     if not place_ids:
         return
+
+    badge = await Badge.get(badge_id)
+    if not badge:
+        return
+
+    from app.models.notification import Notification
+    from app.repositories.notification_repository import NotificationRepository
+    from app.repositories.stats_repository import StatsRepository
+    from app.repositories.user_repository import UserRepository
+    from app.services.notification_service import NotificationService
+    from app.services.points_service import PointsService
+
+    points_svc = PointsService(user_repo=UserRepository(), stats_repo=StatsRepository())
+    notification_svc = NotificationService(NotificationRepository())
+
     required = set(place_ids)
     visit_repo = VisitRepository()
     user_badge_repo = UserBadgeRepository()
@@ -205,6 +220,8 @@ async def _backfill_badge_for_existing_users(badge_id: str, place_ids: list[str]
         visited_ids = set(await visit_repo.get_user_visited_place_ids(user_id))
         if required.issubset(visited_ids):
             await UserBadge(user_id=user_id, badge_id=badge_id).save()
+            await points_svc.award_badge_earned(user_id, badge.points)
+            await notification_svc.notify_new_badge(user_id, badge.name, badge_id)
 
 
 def _badge_to_response(b: Badge) -> BadgeResponse:

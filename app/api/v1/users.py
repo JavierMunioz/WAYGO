@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import CurrentUser, OptionalUser
 from app.dependencies.pagination import PaginationParams
+from app.models.badge import Badge, UserBadge
 from app.repositories.badge_repository import UserBadgeRepository
 from app.repositories.collection_repository import UserCollectionProgressRepository
 from app.repositories.follow_repository import FollowRepository
 from app.repositories.stats_repository import StatsRepository
 from app.repositories.user_repository import UserRepository
+from app.schemas.badge import BadgeResponse, UserBadgeResponse
 from app.schemas.common import MessageResponse, PaginatedResponse
 from app.schemas.user import UpdateProfileRequest, UserProfileResponse
 from app.services.user_service import UserService
@@ -70,6 +72,35 @@ async def unfollow_user(user_id: str, current_user: CurrentUser):
         notification_svc=NotificationService(NotificationRepository()),
     )
     await svc.unfollow(str(current_user.id), user_id)
+
+
+@router.get("/{user_id}/badges", response_model=list[UserBadgeResponse])
+async def get_user_badges(user_id: str, current_user: OptionalUser):
+    """Returns badges earned by a given user. Public endpoint."""
+    user_badge_repo = UserBadgeRepository()
+    user_badges = await user_badge_repo.get_user_badges(user_id)
+
+    result = []
+    for ub in user_badges:
+        badge = await Badge.get(ub.badge_id)
+        if badge and badge.is_active:
+            result.append(
+                UserBadgeResponse(
+                    badge=BadgeResponse(
+                        id=str(badge.id),
+                        name=badge.name,
+                        slug=badge.slug,
+                        description=badge.description,
+                        image_url=badge.image_url,
+                        points=badge.points,
+                        city=badge.city,
+                        country=badge.country,
+                        level=badge.level,
+                    ),
+                    obtained_at=ub.obtained_at,
+                )
+            )
+    return result
 
 
 @router.get("/{user_id}/followers")

@@ -161,6 +161,24 @@ async def admin_update_badge(badge_id: str, data: UpdateBadgeRequest, background
     return _badge_to_response(badge)
 
 
+@router.delete("/{badge_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_badge(badge_id: str, current_user: SuperUser):
+    badge = await Badge.get(badge_id)
+    if not badge:
+        from app.core.exceptions import NotFoundError
+        raise NotFoundError("Badge not found")
+
+    req = await BadgeRequirement.find_one(BadgeRequirement.badge_id == badge_id)
+    if req:
+        await req.delete()
+
+    user_badges = await UserBadge.find(UserBadge.badge_id == badge_id).to_list()
+    for ub in user_badges:
+        await ub.delete()
+
+    await badge.delete()
+
+
 @router.get("/{badge_id}/requirements", response_model=BadgeRequirementResponse)
 async def admin_get_requirements(badge_id: str, current_user: SuperUser):
     req = await BadgeRequirement.find_one(BadgeRequirement.badge_id == badge_id)

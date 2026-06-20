@@ -56,3 +56,17 @@ class UpdateBadgeRequest(BaseSchema):
 class BadgeRequirementResponse(BaseSchema):
     badge_id: str
     place_ids: list[str]
+
+
+class BadgePlaceProgress(BaseSchema):
+    place_id: str
+    name: str
+    city: str
+    country: str
+    slug: str
+    cover_image: str | None = None
+    visited: bool
+
+
+class BadgeDetailResponse(BadgeWithProgressResponse):
+    places: list[BadgePlaceProgress]

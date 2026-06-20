@@ -1,10 +1,16 @@
-from fastapi import APIRouter, status
+import asyncio
+
+from fastapi import APIRouter, BackgroundTasks, status
 
 from app.dependencies.auth import CurrentUser, SuperUser
-from app.models.badge import Badge, BadgeRequirement
+from app.models.badge import Badge, BadgeRequirement, UserBadge
+from app.models.user import User
+from app.models.place import Place as PlaceModel
 from app.repositories.badge_repository import BadgeRepository, BadgeRequirementRepository, UserBadgeRepository
 from app.repositories.visit_repository import VisitRepository
 from app.schemas.badge import (
+    BadgeDetailResponse,
+    BadgePlaceProgress,
     BadgeRequirementResponse,
     BadgeResponse,
     BadgeWithProgressResponse,
@@ -32,6 +38,70 @@ async def get_badges(current_user: CurrentUser):
     return await svc.get_all_badges_with_progress(str(current_user.id))
 
 
+@router.get("/{badge_id}/places", response_model=BadgeDetailResponse)
+async def get_badge_detail(badge_id: str, current_user: CurrentUser):
+    """Returns badge info + required places with visited status for the current user."""
+    badge = await Badge.get(badge_id)
+    if not badge:
+        from app.core.exceptions import NotFoundError
+        raise NotFoundError("Badge not found")
+
+    user_id = str(current_user.id)
+    visit_repo = VisitRepository()
+    visited_ids = set(await visit_repo.get_user_visited_place_ids(user_id))
+
+    req = await BadgeRequirement.find_one(BadgeRequirement.badge_id == badge_id)
+    place_ids = req.place_ids if req else []
+
+    # Fetch all required places in parallel
+    place_docs = []
+    if place_ids:
+        place_docs = await asyncio.gather(
+            *[PlaceModel.get(pid) for pid in place_ids],
+            return_exceptions=True,
+        )
+
+    places_progress: list[BadgePlaceProgress] = []
+    for doc in place_docs:
+        if doc is None or isinstance(doc, Exception):
+            continue
+        places_progress.append(
+            BadgePlaceProgress(
+                place_id=str(doc.id),
+                name=doc.name,
+                city=doc.city,
+                country=doc.country,
+                slug=doc.slug,
+                cover_image=doc.cover_image,
+                visited=str(doc.id) in visited_ids,
+            )
+        )
+
+    required_count = len(place_ids)
+    visited_count = sum(1 for p in places_progress if p.visited)
+    progress_pct = (visited_count / required_count * 100) if required_count > 0 else 0
+
+    user_badge_repo = UserBadgeRepository()
+    earned_ids = await user_badge_repo.get_user_badge_ids(user_id)
+
+    return BadgeDetailResponse(
+        id=badge_id,
+        name=badge.name,
+        slug=badge.slug,
+        description=badge.description,
+        image_url=badge.image_url,
+        points=badge.points,
+        city=badge.city,
+        country=badge.country,
+        level=badge.level,
+        required_places=required_count,
+        visited_places=visited_count,
+        progress_pct=round(progress_pct, 1),
+        completed=badge_id in earned_ids,
+        places=places_progress,
+    )
+
+
 # ── Admin endpoints ────────────────────────────────────────────────────────────
 
 @router.get("/admin/all", response_model=list[BadgeResponse])
@@ -41,7 +111,7 @@ async def admin_list_badges(current_user: SuperUser):
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=BadgeResponse)
-async def admin_create_badge(data: CreateBadgeRequest, current_user: SuperUser):
+async def admin_create_badge(data: CreateBadgeRequest, background_tasks: BackgroundTasks, current_user: SuperUser):
     slug = slugify(data.name)
     existing = await Badge.find_one(Badge.slug == slug)
     if existing:
@@ -59,15 +129,17 @@ async def admin_create_badge(data: CreateBadgeRequest, current_user: SuperUser):
     )
     await badge.save()
 
+    badge_id = str(badge.id)
     if data.place_ids:
-        req = BadgeRequirement(badge_id=str(badge.id), place_ids=data.place_ids)
+        req = BadgeRequirement(badge_id=badge_id, place_ids=data.place_ids)
         await req.save()
+        background_tasks.add_task(_backfill_badge_for_existing_users, badge_id, data.place_ids)
 
     return _badge_to_response(badge)
 
 
 @router.patch("/{badge_id}", response_model=BadgeResponse)
-async def admin_update_badge(badge_id: str, data: UpdateBadgeRequest, current_user: SuperUser):
+async def admin_update_badge(badge_id: str, data: UpdateBadgeRequest, background_tasks: BackgroundTasks, current_user: SuperUser):
     badge = await Badge.get(badge_id)
     if not badge:
         from app.core.exceptions import NotFoundError
@@ -84,6 +156,7 @@ async def admin_update_badge(badge_id: str, data: UpdateBadgeRequest, current_us
             await req.set({BadgeRequirement.place_ids: data.place_ids})
         else:
             await BadgeRequirement(badge_id=badge_id, place_ids=data.place_ids).save()
+        background_tasks.add_task(_backfill_badge_for_existing_users, badge_id, data.place_ids)
 
     return _badge_to_response(badge)
 
@@ -95,6 +168,25 @@ async def admin_get_requirements(badge_id: str, current_user: SuperUser):
         badge_id=badge_id,
         place_ids=req.place_ids if req else [],
     )
+
+
+async def _backfill_badge_for_existing_users(badge_id: str, place_ids: list[str]) -> None:
+    """Award badge to users who already visited all required places."""
+    if not place_ids:
+        return
+    required = set(place_ids)
+    visit_repo = VisitRepository()
+    user_badge_repo = UserBadgeRepository()
+
+    all_users = await User.find_all().to_list()
+    for user in all_users:
+        user_id = str(user.id)
+        already_earned = await user_badge_repo.has_badge(user_id, badge_id)
+        if already_earned:
+            continue
+        visited_ids = set(await visit_repo.get_user_visited_place_ids(user_id))
+        if required.issubset(visited_ids):
+            await UserBadge(user_id=user_id, badge_id=badge_id).save()
 
 
 def _badge_to_response(b: Badge) -> BadgeResponse:

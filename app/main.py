@@ -23,7 +23,7 @@ if settings.SENTRY_DSN:
         dsn=settings.SENTRY_DSN,
         environment=settings.APP_ENV,
         release=f"waygo@{settings.APP_VERSION}",
-        send_default_pii=True,
+        send_default_pii=False,  # Do not send PII (emails, IPs) to Sentry — GDPR/Ley1581 compliance
         traces_sample_rate=1.0 if settings.APP_ENV != "production" else 0.2,
         profile_session_sample_rate=1.0,
         profile_lifecycle="trace",

@@ -2,6 +2,7 @@ from app.models.badge import Badge, BadgeRequirement, UserBadge
 from app.models.collection import Collection, UserCollectionProgress
 from app.models.comment import Comment
 from app.models.follow import Follow
+from app.models.legal import LegalDocument, UserConsent
 from app.models.notification import Notification
 from app.models.otp_code import OTPCode
 from app.models.photo import Photo, PhotoLike, PhotoSave
@@ -28,6 +29,8 @@ BEANIE_DOCUMENT_MODELS = [
     Notification,
     UserStats,
     OTPCode,
+    LegalDocument,
+    UserConsent,
 ]
 
 __all__ = [
@@ -48,5 +51,7 @@ __all__ = [
     "Notification",
     "UserStats",
     "OTPCode",
+    "LegalDocument",
+    "UserConsent",
     "BEANIE_DOCUMENT_MODELS",
 ]

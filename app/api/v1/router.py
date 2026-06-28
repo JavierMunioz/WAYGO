@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, badges, collections, comments, feed, notifications, photos, places, rankings, users, visits
+from app.api.v1 import auth, badges, collections, comments, feed, legal, notifications, photos, places, rankings, users, visits
 
 api_router = APIRouter()
 
@@ -15,3 +15,4 @@ api_router.include_router(badges.router)
 api_router.include_router(collections.router)
 api_router.include_router(rankings.router)
 api_router.include_router(notifications.router)
+api_router.include_router(legal.router)

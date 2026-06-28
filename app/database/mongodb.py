@@ -120,4 +120,17 @@ async def _create_indexes() -> None:
     await db.refresh_tokens.create_index([("user_id", ASCENDING)])
     await db.refresh_tokens.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
 
+    # Legal Documents
+    await db.legal_documents.create_index([("doc_type", ASCENDING), ("is_active", ASCENDING)])
+    await db.legal_documents.create_index([("doc_type", ASCENDING), ("version", ASCENDING)], unique=True)
+
+    # User Consents
+    await db.user_consents.create_index([("user_id", ASCENDING)])
+    await db.user_consents.create_index(
+        [("user_id", ASCENDING), ("doc_type", ASCENDING), ("doc_version", ASCENDING)],
+        unique=True,
+    )
+    await db.user_consents.create_index([("doc_type", ASCENDING), ("doc_version", ASCENDING)])
+    await db.user_consents.create_index([("consent_uid", ASCENDING)], unique=True)
+
     logger.info("All indexes created/verified.")

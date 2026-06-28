@@ -1,4 +1,19 @@
 from app.core.exceptions import ForbiddenError, NotFoundError, StorageError
+
+# Magic byte signatures for allowed image formats
+_MAGIC_BYTES: dict[str, list[bytes]] = {
+    "image/jpeg": [b"\xff\xd8\xff"],
+    "image/png": [b"\x89PNG\r\n\x1a\n"],
+    "image/webp": [b"RIFF"],
+}
+
+
+def _validate_image_magic(content: bytes, content_type: str) -> bool:
+    if content_type == "image/webp":
+        # RIFF....WEBP — bytes 0-3 are RIFF, bytes 8-11 are WEBP
+        return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    signatures = _MAGIC_BYTES.get(content_type, [])
+    return any(content.startswith(sig) for sig in signatures)
 from app.utils.storage import store_file
 from app.models.photo import Photo
 from app.repositories.photo_repository import PhotoRepository
@@ -35,6 +50,8 @@ class PhotoService:
             raise StorageError(f"Unsupported image type: {content_type}")
         if len(file_content) > MAX_PHOTO_SIZE_MB * 1024 * 1024:
             raise StorageError(f"Image exceeds {MAX_PHOTO_SIZE_MB}MB limit")
+        if not _validate_image_magic(file_content, content_type):
+            raise StorageError("File content does not match declared image type")
 
         visit = await self._visit_repo.get_by_id(visit_id)
         if visit.user_id != user_id:

@@ -6,12 +6,16 @@ from pydantic import Field
 from typing import Annotated
 
 
+MAX_OTP_ATTEMPTS = 5
+
+
 class OTPCode(Document):
     email: Annotated[str, Indexed()]
     code: str  # 6-digit string
     purpose: Literal["email_verify", "password_reset"]
     expires_at: datetime
     used: bool = False
+    attempts: int = 0
 
     class Settings:
         name = "otp_codes"

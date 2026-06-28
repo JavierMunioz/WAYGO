@@ -3,6 +3,7 @@ import logging.config
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,6 +16,19 @@ from app.database.mongodb import close_mongo_connection, connect_to_mongo
 from app.database.redis import close_redis
 from app.middleware.logging_middleware import LoggingMiddleware
 from app.middleware.rate_limiter import RateLimiterMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
+
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.APP_ENV,
+        release=f"waygo@{settings.APP_VERSION}",
+        send_default_pii=True,
+        traces_sample_rate=1.0 if settings.APP_ENV != "production" else 0.2,
+        profile_session_sample_rate=1.0,
+        profile_lifecycle="trace",
+        _experiments={"enable_logs": True},
+    )
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -65,6 +79,7 @@ def create_app() -> FastAPI:
     )
 
     # Custom middleware (order matters — outermost first)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RateLimiterMiddleware)
 
@@ -80,6 +95,11 @@ def create_app() -> FastAPI:
     @app.get("/health", include_in_schema=False)
     async def health():
         return {"status": "ok", "version": settings.APP_VERSION}
+
+    if settings.APP_ENV != "production":
+        @app.get("/sentry-debug", include_in_schema=False)
+        async def sentry_debug():
+            division_by_zero = 1 / 0
 
     # API routes
     app.include_router(api_router, prefix=settings.API_PREFIX)

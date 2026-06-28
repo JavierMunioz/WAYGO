@@ -36,6 +36,9 @@ pytest==8.3.3
 pytest-asyncio==0.24.0
 pytest-cov==6.0.0
 
+# Monitoring
+sentry-sdk[fastapi]==2.29.1
+
 # Code quality
 ruff==0.8.1
 mypy==1.13.0

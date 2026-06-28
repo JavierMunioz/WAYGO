@@ -1,4 +1,4 @@
-import random
+import secrets
 import string
 from datetime import UTC, datetime, timedelta
 
@@ -20,7 +20,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models.otp_code import OTPCode
+from app.models.otp_code import MAX_OTP_ATTEMPTS, OTPCode
 from app.models.user import User, RefreshToken
 from app.models.user_stats import UserStats
 from app.repositories.stats_repository import StatsRepository
@@ -123,7 +123,7 @@ class AuthService:
 
     @staticmethod
     def _generate_otp() -> str:
-        return "".join(random.choices(string.digits, k=6))
+        return "".join(secrets.choice(string.digits) for _ in range(6))
 
     async def generate_email_verification_otp(self, email: str) -> str:
         # Invalidate any previous unused OTPs for this email+purpose
@@ -136,11 +136,15 @@ class AuthService:
     async def verify_email_otp(self, email: str, code: str) -> None:
         otp = await OTPCode.find_one(
             OTPCode.email == email,
-            OTPCode.code == code,
             OTPCode.purpose == "email_verify",
             OTPCode.used == False,  # noqa: E712
         )
         if not otp or otp.is_expired:
+            raise InvalidTokenError("Código inválido o expirado")
+        if otp.attempts >= MAX_OTP_ATTEMPTS:
+            raise InvalidTokenError("Demasiados intentos fallidos. Solicita un nuevo código.")
+        if otp.code != code:
+            await otp.set({OTPCode.attempts: otp.attempts + 1})
             raise InvalidTokenError("Código inválido o expirado")
         await otp.set({OTPCode.used: True})
         user = await self._user_repo.get_by_email(email)
@@ -160,11 +164,15 @@ class AuthService:
     async def reset_password_otp(self, email: str, code: str, new_password: str) -> None:
         otp = await OTPCode.find_one(
             OTPCode.email == email,
-            OTPCode.code == code,
             OTPCode.purpose == "password_reset",
             OTPCode.used == False,  # noqa: E712
         )
         if not otp or otp.is_expired:
+            raise InvalidTokenError("Código inválido o expirado")
+        if otp.attempts >= MAX_OTP_ATTEMPTS:
+            raise InvalidTokenError("Demasiados intentos fallidos. Solicita un nuevo código.")
+        if otp.code != code:
+            await otp.set({OTPCode.attempts: otp.attempts + 1})
             raise InvalidTokenError("Código inválido o expirado")
         user = await self._user_repo.get_by_email(email)
         if not user:

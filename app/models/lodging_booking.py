@@ -21,6 +21,14 @@ class LodgingBooking(Document):
     price: float
     currency: str
 
+    # "held" = solo guardada localmente (tarifa verificada, sin reservar de
+    # verdad); "confirmed" = ya se llamó a Hotelbeds /bookings y hay una
+    # reserva real con ese hotel.
+    status: str = "held"
+    hotelbeds_reference: str | None = None  # locator que devuelve Hotelbeds al confirmar
+    holder_name: str | None = None
+    holder_surname: str | None = None
+
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:

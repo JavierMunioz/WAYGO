@@ -56,4 +56,11 @@ class LodgingBookingResponse(BaseSchema):
     check_out: datetime
     price: float
     currency: str
+    status: str
+    hotelbeds_reference: str | None = None
     created_at: datetime
+
+
+class ConfirmLodgingBookingRequest(BaseSchema):
+    holder_name: str = Field(min_length=1, max_length=100)
+    holder_surname: str = Field(min_length=1, max_length=100)

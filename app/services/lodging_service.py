@@ -149,6 +149,51 @@ class LodgingService:
         await booking.save()
         return booking
 
+    async def confirm_booking(self, trip_id: str, user_id: str, holder_name: str, holder_surname: str) -> LodgingBooking:
+        """Confirma la reserva de verdad con Hotelbeds (`/hotel-api/1.0/bookings`).
+        Hasta este punto solo teníamos la tarifa verificada guardada localmente
+        ("held") — esto es lo que realmente reserva la habitación."""
+        trip = await self._trip_repo.get_by_id(trip_id)
+        ensure_trip_owner(trip, user_id)
+
+        booking = await self._repo.get_by_trip_id(trip_id)
+        if not booking:
+            raise NotFoundError("No lodging booked for this trip")
+        if booking.status == "confirmed":
+            return booking
+
+        body = {
+            "holder": {"name": holder_name, "surname": holder_surname},
+            "rooms": [
+                {
+                    "rateKey": booking.rate_key,
+                    "paxes": [{"roomId": 1, "type": "AD", "name": holder_name, "surname": holder_surname}],
+                }
+            ],
+            "clientReference": f"waygo-{trip_id}",
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(
+                    f"{settings.HOTELBEDS_API_BASE_URL}/hotel-api/1.0/bookings",
+                    json=body,
+                    headers=_hotelbeds_headers(),
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as e:
+                raise ExternalServiceError(
+                    f"No se pudo confirmar la reserva con el hotel (la tarifa puede haber expirado, busca de nuevo): {e}"
+                )
+
+        data = response.json().get("booking", {})
+        booking.status = "confirmed"
+        booking.hotelbeds_reference = data.get("reference")
+        booking.holder_name = holder_name
+        booking.holder_surname = holder_surname
+        await booking.save()
+        return booking
+
     async def get_lodging(self, trip_id: str, user_id: str) -> LodgingBooking:
         trip = await self._trip_repo.get_by_id(trip_id)
         ensure_trip_owner(trip, user_id)

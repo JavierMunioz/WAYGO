@@ -9,6 +9,7 @@ from app.repositories.hotelbeds_destination_repository import HotelbedsDestinati
 from app.repositories.lodging_booking_repository import LodgingBookingRepository
 from app.repositories.trip_repository import TripRepository
 from app.schemas.lodging import (
+    ConfirmLodgingBookingRequest,
     DestinationSuggestion,
     HotelOffer,
     LodgingBookingResponse,
@@ -74,6 +75,13 @@ async def delete_lodging(trip_id: str, current_user: CurrentUser):
     await svc.delete_lodging(trip_id, str(current_user.id))
 
 
+@router.post("/confirm", response_model=LodgingBookingResponse)
+async def confirm_lodging(trip_id: str, data: ConfirmLodgingBookingRequest, current_user: CurrentUser):
+    svc = _get_service()
+    booking = await svc.confirm_booking(trip_id, str(current_user.id), data.holder_name, data.holder_surname)
+    return _to_response(booking)
+
+
 def _to_response(booking: LodgingBooking) -> LodgingBookingResponse:
     return LodgingBookingResponse(
         id=str(booking.id),
@@ -86,5 +94,7 @@ def _to_response(booking: LodgingBooking) -> LodgingBookingResponse:
         check_out=booking.check_out,
         price=booking.price,
         currency=booking.currency,
+        status=booking.status,
+        hotelbeds_reference=booking.hotelbeds_reference,
         created_at=booking.created_at,
     )

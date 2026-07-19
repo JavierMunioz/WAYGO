@@ -5,17 +5,24 @@ from app.dependencies.pagination import PaginationParams
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.photo_repository import PhotoLikeRepository, PhotoRepository, PhotoSaveRepository
 from app.repositories.place_repository import PlaceRepository
+from app.repositories.report_repository import ReportRepository
 from app.repositories.stats_repository import StatsRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.visit_repository import VisitRepository
 from app.schemas.common import MessageResponse
 from app.schemas.photo import PhotoResponse
+from app.schemas.report import CreateReportRequest, ReportResponse
 from app.services.like_service import LikeService
 from app.services.notification_service import NotificationService
 from app.services.photo_service import PhotoService
 from app.services.points_service import PointsService
+from app.services.report_service import ReportService
 
 router = APIRouter(prefix="/photos", tags=["Photos"])
+
+
+def _get_report_service() -> ReportService:
+    return ReportService(ReportRepository(), PhotoRepository())
 
 
 def _get_photo_service() -> PhotoService:
@@ -70,6 +77,19 @@ async def get_photo(photo_id: str):
 async def delete_photo(photo_id: str, current_user: CurrentUser):
     svc = _get_photo_service()
     await svc.delete_photo(str(current_user.id), photo_id)
+
+
+@router.post("/{photo_id}/report", status_code=status.HTTP_201_CREATED, response_model=ReportResponse)
+async def report_photo(photo_id: str, data: CreateReportRequest, current_user: CurrentUser):
+    svc = _get_report_service()
+    report = await svc.report_photo(str(current_user.id), photo_id, data.reason)
+    return ReportResponse(
+        id=str(report.id),
+        target_type=report.target_type,
+        target_id=report.target_id,
+        status=report.status,
+        created_at=report.created_at,
+    )
 
 
 @router.post("/{photo_id}/like", status_code=status.HTTP_204_NO_CONTENT)

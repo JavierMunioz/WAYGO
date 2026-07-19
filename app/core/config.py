@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # Flights (Duffel API — https://duffel.com)
+    DUFFEL_API_KEY: str = "YOUR_DUFFEL_ACCESS_TOKEN_HERE"
+    DUFFEL_API_BASE_URL: str = "https://api.duffel.com"
+    DUFFEL_VERSION: str = "v2"
+
     # Sentry
     SENTRY_DSN: str = ""
 

@@ -74,3 +74,8 @@ class RateLimitError(WaygoException):
 class StorageError(WaygoException):
     status_code = 500
     detail = "Storage operation failed"
+
+
+class ExternalServiceError(WaygoException):
+    status_code = 502
+    detail = "External service error"

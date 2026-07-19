@@ -2,6 +2,7 @@ from app.models.badge import Badge, BadgeRequirement, UserBadge
 from app.models.collection import Collection, UserCollectionProgress
 from app.models.comment import Comment
 from app.models.destination import Destination
+from app.models.flight_booking import FlightBooking
 from app.models.follow import Follow
 from app.models.itinerary import Itinerary
 from app.models.legal import LegalDocument, UserConsent
@@ -21,6 +22,7 @@ BEANIE_DOCUMENT_MODELS = [
     Destination,
     Trip,
     Itinerary,
+    FlightBooking,
     Visit,
     Photo,
     PhotoLike,
@@ -46,6 +48,7 @@ __all__ = [
     "Destination",
     "Trip",
     "Itinerary",
+    "FlightBooking",
     "Visit",
     "Photo",
     "PhotoLike",

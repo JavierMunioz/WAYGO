@@ -77,6 +77,10 @@ async def _create_indexes() -> None:
     await db.itineraries.create_index([("trip_id", ASCENDING)], unique=True)
     await db.itineraries.create_index([("user_id", ASCENDING)])
 
+    # Flight bookings
+    await db.flight_bookings.create_index([("trip_id", ASCENDING)], unique=True)
+    await db.flight_bookings.create_index([("user_id", ASCENDING)])
+
     # Visits
     await db.visits.create_index([("user_id", ASCENDING), ("place_id", ASCENDING)])
     await db.visits.create_index([("user_id", ASCENDING), ("verified", ASCENDING)])

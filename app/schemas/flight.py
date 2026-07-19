@@ -49,4 +49,16 @@ class FlightBookingResponse(BaseSchema):
     price: float
     currency: str
     deep_link: str | None = None
+    status: str
+    booking_reference: str | None = None
     created_at: datetime
+
+
+class ConfirmFlightBookingRequest(BaseSchema):
+    given_name: str = Field(min_length=1, max_length=100)
+    family_name: str = Field(min_length=1, max_length=100)
+    born_on: str = Field(description="Fecha de nacimiento, formato YYYY-MM-DD")
+    email: str
+    phone_number: str = Field(description="Formato E.164, ej. +573001234567")
+    title: str = Field(description="mr | mrs | ms | miss")
+    gender: str = Field(description="m | f")

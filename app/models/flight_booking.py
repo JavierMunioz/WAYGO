@@ -20,6 +20,14 @@ class FlightBooking(Document):
     booking_token: str  # Duffel offer id (off_...)
     deep_link: str | None = None  # reserved for a future affiliate/checkout flow
 
+    # "held" = solo se guardó la oferta elegida (sin reservar de verdad);
+    # "confirmed" = ya se creó la Order real en Duffel (/air/orders).
+    status: str = "held"
+    duffel_order_id: str | None = None
+    booking_reference: str | None = None  # PNR de la aerolínea
+    passenger_given_name: str | None = None
+    passenger_family_name: str | None = None
+
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:

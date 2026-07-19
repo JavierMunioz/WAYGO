@@ -8,7 +8,7 @@ from app.core.exceptions import ExternalServiceError, NotFoundError
 from app.models.flight_booking import FlightBooking
 from app.repositories.flight_booking_repository import FlightBookingRepository
 from app.repositories.trip_repository import TripRepository
-from app.schemas.flight import FlightOffer, FlightSearchRequest, SaveFlightRequest
+from app.schemas.flight import ConfirmFlightBookingRequest, FlightOffer, FlightSearchRequest, SaveFlightRequest
 from app.utils.ownership import ensure_trip_owner
 
 _ISO_DURATION_RE = re.compile(r"PT(?:(\d+)H)?(?:(\d+)M)?")
@@ -101,8 +101,7 @@ class FlightService:
             offers.append(FlightOffer(booking_token=offer["id"], deep_link="", **_offer_to_dict(offer)))
         return offers
 
-    async def _fetch_verified_offer(self, booking_token: str) -> dict:
-        """Vuelve a pedirle la oferta a Duffel — nunca confiamos en el precio/fechas que mande el cliente."""
+    async def _fetch_raw_offer(self, booking_token: str) -> dict:
         async with httpx.AsyncClient(timeout=20.0) as client:
             try:
                 response = await client.get(
@@ -114,7 +113,11 @@ class FlightService:
                 raise ExternalServiceError(
                     f"No se pudo verificar la oferta de vuelo (puede haber expirado, busca de nuevo): {e}"
                 )
-        return _offer_to_dict(response.json()["data"])
+        return response.json()["data"]
+
+    async def _fetch_verified_offer(self, booking_token: str) -> dict:
+        """Vuelve a pedirle la oferta a Duffel — nunca confiamos en el precio/fechas que mande el cliente."""
+        return _offer_to_dict(await self._fetch_raw_offer(booking_token))
 
     async def save_flight(self, trip_id: str, user_id: str, data: SaveFlightRequest) -> FlightBooking:
         trip = await self._trip_repo.get_by_id(trip_id)
@@ -141,6 +144,73 @@ class FlightService:
             return existing
 
         booking = FlightBooking(trip_id=trip_id, user_id=user_id, **fields)
+        await booking.save()
+        return booking
+
+    async def confirm_booking(self, trip_id: str, user_id: str, data: ConfirmFlightBookingRequest) -> FlightBooking:
+        """Crea la Order real en Duffel (`/air/orders`). En modo test usa el
+        saldo simulado de la cuenta (gratis, sin plata real); en producción
+        (`live_mode`) esto requiere saldo real prefondeado en la cuenta Duffel
+        o aprobación de pago con tarjeta — no alcanza con conectar Stripe."""
+        trip = await self._trip_repo.get_by_id(trip_id)
+        ensure_trip_owner(trip, user_id)
+
+        booking = await self._repo.get_by_trip_id(trip_id)
+        if not booking:
+            raise NotFoundError("No flight booked for this trip")
+        if booking.status == "confirmed":
+            return booking
+
+        raw_offer = await self._fetch_raw_offer(booking.booking_token)
+        passengers = raw_offer.get("passengers", [])
+        if not passengers:
+            raise ExternalServiceError("La oferta no tiene pasajeros asociados — búscala de nuevo")
+        pax_id = passengers[0]["id"]
+
+        order_body = {
+            "data": {
+                "selected_offers": [booking.booking_token],
+                "passengers": [
+                    {
+                        "id": pax_id,
+                        "given_name": data.given_name,
+                        "family_name": data.family_name,
+                        "born_on": data.born_on,
+                        "email": data.email,
+                        "phone_number": data.phone_number,
+                        "title": data.title,
+                        "gender": data.gender,
+                    }
+                ],
+                "payments": [
+                    {
+                        "type": "balance",
+                        "currency": raw_offer["total_currency"],
+                        "amount": raw_offer["total_amount"],
+                    }
+                ],
+            }
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(
+                    f"{settings.DUFFEL_API_BASE_URL}/air/orders",
+                    json=order_body,
+                    headers={**_DUFFEL_HEADERS, "Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as e:
+                raise ExternalServiceError(
+                    f"No se pudo confirmar la reserva del vuelo (la oferta puede haber expirado, busca de nuevo): {e}"
+                )
+
+        order = response.json()["data"]
+        booking.status = "confirmed"
+        booking.duffel_order_id = order.get("id")
+        booking.booking_reference = order.get("booking_reference")
+        booking.passenger_given_name = data.given_name
+        booking.passenger_family_name = data.family_name
         await booking.save()
         return booking
 

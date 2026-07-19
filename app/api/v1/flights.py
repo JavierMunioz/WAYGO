@@ -6,7 +6,13 @@ from app.dependencies.auth import CurrentUser
 from app.models.flight_booking import FlightBooking
 from app.repositories.flight_booking_repository import FlightBookingRepository
 from app.repositories.trip_repository import TripRepository
-from app.schemas.flight import FlightBookingResponse, FlightOffer, FlightSearchRequest, SaveFlightRequest
+from app.schemas.flight import (
+    ConfirmFlightBookingRequest,
+    FlightBookingResponse,
+    FlightOffer,
+    FlightSearchRequest,
+    SaveFlightRequest,
+)
 from app.services.flight_service import FlightService
 
 router = APIRouter(prefix="/trips/{trip_id}/flights", tags=["Flights"])
@@ -57,6 +63,13 @@ async def delete_flight(trip_id: str, current_user: CurrentUser):
     await svc.delete_flight(trip_id, str(current_user.id))
 
 
+@router.post("/confirm", response_model=FlightBookingResponse)
+async def confirm_flight(trip_id: str, data: ConfirmFlightBookingRequest, current_user: CurrentUser):
+    svc = _get_service()
+    booking = await svc.confirm_booking(trip_id, str(current_user.id), data)
+    return _to_response(booking)
+
+
 def _to_response(booking: FlightBooking) -> FlightBookingResponse:
     return FlightBookingResponse(
         id=str(booking.id),
@@ -69,5 +82,7 @@ def _to_response(booking: FlightBooking) -> FlightBookingResponse:
         price=booking.price,
         currency=booking.currency,
         deep_link=booking.deep_link,
+        status=booking.status,
+        booking_reference=booking.booking_reference,
         created_at=booking.created_at,
     )

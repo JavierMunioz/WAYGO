@@ -1,16 +1,23 @@
 import re
+from datetime import datetime
 
 import httpx
 
 from app.core.config import settings
-from app.core.exceptions import ExternalServiceError, ForbiddenError, NotFoundError
+from app.core.exceptions import ExternalServiceError, NotFoundError
 from app.models.flight_booking import FlightBooking
-from app.models.trip import Trip
 from app.repositories.flight_booking_repository import FlightBookingRepository
 from app.repositories.trip_repository import TripRepository
 from app.schemas.flight import FlightOffer, FlightSearchRequest, SaveFlightRequest
+from app.utils.ownership import ensure_trip_owner
 
 _ISO_DURATION_RE = re.compile(r"PT(?:(\d+)H)?(?:(\d+)M)?")
+
+_DUFFEL_HEADERS = {
+    "Authorization": f"Bearer {settings.DUFFEL_API_KEY}",
+    "Duffel-Version": settings.DUFFEL_VERSION,
+    "Accept": "application/json",
+}
 
 
 def _parse_duration_minutes(duration: str | None) -> int:
@@ -22,6 +29,25 @@ def _parse_duration_minutes(duration: str | None) -> int:
     hours = int(match.group(1) or 0)
     minutes = int(match.group(2) or 0)
     return hours * 60 + minutes
+
+
+def _offer_to_dict(offer: dict) -> dict:
+    slices_data = offer.get("slices", [])
+    outbound = slices_data[0] if slices_data else {}
+    outbound_segments = outbound.get("segments", [])
+    return_slice = slices_data[1] if len(slices_data) > 1 else None
+    return_segments = return_slice.get("segments", []) if return_slice else []
+
+    return {
+        "airline": offer.get("owner", {}).get("name", "N/A"),
+        "price": float(offer["total_amount"]),
+        "currency": offer["total_currency"],
+        "departure_time": outbound_segments[0]["departing_at"] if outbound_segments else None,
+        "arrival_time": outbound_segments[-1]["arriving_at"] if outbound_segments else None,
+        "return_departure_time": return_segments[0]["departing_at"] if return_segments else None,
+        "return_arrival_time": return_segments[-1]["arriving_at"] if return_segments else None,
+        "duration_minutes": _parse_duration_minutes(outbound.get("duration")),
+    }
 
 
 class FlightService:
@@ -59,12 +85,7 @@ class FlightService:
                 response = await client.post(
                     f"{settings.DUFFEL_API_BASE_URL}/air/offer_requests",
                     json=body,
-                    headers={
-                        "Authorization": f"Bearer {settings.DUFFEL_API_KEY}",
-                        "Duffel-Version": settings.DUFFEL_VERSION,
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
+                    headers={**_DUFFEL_HEADERS, "Content-Type": "application/json"},
                 )
                 response.raise_for_status()
             except httpx.HTTPError as e:
@@ -75,51 +96,57 @@ class FlightService:
 
         offers: list[FlightOffer] = []
         for offer in raw_offers[:20]:
-            slices_data = offer.get("slices", [])
-            if not slices_data:
+            if not offer.get("slices") or not offer["slices"][0].get("segments"):
                 continue
-            outbound = slices_data[0]
-            outbound_segments = outbound.get("segments", [])
-            if not outbound_segments:
-                continue
-
-            return_slice = slices_data[1] if len(slices_data) > 1 else None
-            return_segments = return_slice.get("segments", []) if return_slice else []
-
-            offers.append(
-                FlightOffer(
-                    booking_token=offer["id"],
-                    airline=offer.get("owner", {}).get("name", "N/A"),
-                    price=float(offer["total_amount"]),
-                    currency=offer["total_currency"],
-                    departure_time=outbound_segments[0]["departing_at"],
-                    arrival_time=outbound_segments[-1]["arriving_at"],
-                    return_departure_time=return_segments[0]["departing_at"] if return_segments else None,
-                    return_arrival_time=return_segments[-1]["arriving_at"] if return_segments else None,
-                    duration_minutes=_parse_duration_minutes(outbound.get("duration")),
-                    deep_link="",
-                )
-            )
+            offers.append(FlightOffer(booking_token=offer["id"], deep_link="", **_offer_to_dict(offer)))
         return offers
+
+    async def _fetch_verified_offer(self, booking_token: str) -> dict:
+        """Vuelve a pedirle la oferta a Duffel — nunca confiamos en el precio/fechas que mande el cliente."""
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            try:
+                response = await client.get(
+                    f"{settings.DUFFEL_API_BASE_URL}/air/offers/{booking_token}",
+                    headers=_DUFFEL_HEADERS,
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as e:
+                raise ExternalServiceError(
+                    f"No se pudo verificar la oferta de vuelo (puede haber expirado, busca de nuevo): {e}"
+                )
+        return _offer_to_dict(response.json()["data"])
 
     async def save_flight(self, trip_id: str, user_id: str, data: SaveFlightRequest) -> FlightBooking:
         trip = await self._trip_repo.get_by_id(trip_id)
-        self._ensure_owner(trip, user_id)
+        ensure_trip_owner(trip, user_id)
+
+        verified = await self._fetch_verified_offer(data.booking_token)
+        fields = {
+            "origin": data.origin,
+            "destination": data.destination,
+            "departure_date": datetime.fromisoformat(verified["departure_time"]) if verified["departure_time"] else data.departure_date,
+            "return_date": datetime.fromisoformat(verified["return_departure_time"]) if verified["return_departure_time"] else data.return_date,
+            "airline": verified["airline"],
+            "price": verified["price"],
+            "currency": verified["currency"],
+            "booking_token": data.booking_token,
+            "deep_link": data.deep_link,
+        }
 
         existing = await self._repo.get_by_trip_id(trip_id)
         if existing:
-            for key, val in data.model_dump().items():
+            for key, val in fields.items():
                 setattr(existing, key, val)
             await existing.save()
             return existing
 
-        booking = FlightBooking(trip_id=trip_id, user_id=user_id, **data.model_dump())
+        booking = FlightBooking(trip_id=trip_id, user_id=user_id, **fields)
         await booking.save()
         return booking
 
     async def get_flight(self, trip_id: str, user_id: str) -> FlightBooking:
         trip = await self._trip_repo.get_by_id(trip_id)
-        self._ensure_owner(trip, user_id)
+        ensure_trip_owner(trip, user_id)
 
         booking = await self._repo.get_by_trip_id(trip_id)
         if not booking:
@@ -129,8 +156,3 @@ class FlightService:
     async def delete_flight(self, trip_id: str, user_id: str) -> None:
         booking = await self.get_flight(trip_id, user_id)
         await booking.delete()
-
-    @staticmethod
-    def _ensure_owner(trip: Trip, user_id: str) -> None:
-        if trip.user_id != user_id:
-            raise ForbiddenError("You do not own this trip")

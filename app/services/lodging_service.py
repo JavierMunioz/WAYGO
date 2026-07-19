@@ -5,18 +5,28 @@ from datetime import datetime
 import httpx
 
 from app.core.config import settings
-from app.core.exceptions import ExternalServiceError, ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from app.models.lodging_booking import LodgingBooking
-from app.models.trip import Trip
 from app.repositories.flight_booking_repository import FlightBookingRepository
 from app.repositories.lodging_booking_repository import LodgingBookingRepository
 from app.repositories.trip_repository import TripRepository
 from app.schemas.lodging import HotelOffer, LodgingSearchRequest, SaveLodgingRequest
+from app.utils.datetime_utils import to_naive_utc
+from app.utils.ownership import ensure_trip_owner
 
 
 def _build_signature() -> str:
     raw = f"{settings.HOTELBEDS_API_KEY}{settings.HOTELBEDS_SECRET}{int(time.time())}"
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _hotelbeds_headers() -> dict:
+    return {
+        "Api-key": settings.HOTELBEDS_API_KEY,
+        "X-Signature": _build_signature(),
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
 
 
 class LodgingService:
@@ -45,12 +55,7 @@ class LodgingService:
                 response = await client.post(
                     f"{settings.HOTELBEDS_API_BASE_URL}/hotel-api/1.0/hotels",
                     json=body,
-                    headers={
-                        "Api-key": settings.HOTELBEDS_API_KEY,
-                        "X-Signature": _build_signature(),
-                        "Accept": "application/json",
-                        "Content-Type": "application/json",
-                    },
+                    headers=_hotelbeds_headers(),
                 )
                 response.raise_for_status()
             except httpx.HTTPError as e:
@@ -84,25 +89,69 @@ class LodgingService:
             )
         return offers
 
+    async def _fetch_verified_rate(self, rate_key: str) -> dict:
+        """Reconfirma la tarifa con Hotelbeds — nunca confiamos en el precio que mande el cliente."""
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            try:
+                response = await client.post(
+                    f"{settings.HOTELBEDS_API_BASE_URL}/hotel-api/1.0/checkrates",
+                    json={"rooms": [{"rateKey": rate_key}]},
+                    headers=_hotelbeds_headers(),
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as e:
+                raise ExternalServiceError(
+                    f"No se pudo reconfirmar la tarifa de hospedaje (puede haber expirado, busca de nuevo): {e}"
+                )
+
+        hotel = response.json()["hotel"]
+        rate = hotel["rooms"][0]["rates"][0]
+        return {
+            "hotel_name": hotel["name"],
+            "room_name": hotel["rooms"][0].get("name", ""),
+            "board_name": rate.get("boardName", ""),
+            "price": float(rate["net"]),
+            "currency": hotel.get("currency", "EUR"),
+            "check_in": hotel.get("checkIn"),
+            "check_out": hotel.get("checkOut"),
+        }
+
     async def save_lodging(self, trip_id: str, user_id: str, data: SaveLodgingRequest) -> LodgingBooking:
         trip = await self._trip_repo.get_by_id(trip_id)
-        self._ensure_owner(trip, user_id)
-        await self._ensure_within_flight_return(trip_id, data.check_out)
+        ensure_trip_owner(trip, user_id)
+
+        verified = await self._fetch_verified_rate(data.rate_key)
+        check_in = datetime.fromisoformat(verified["check_in"]) if verified["check_in"] else data.check_in
+        check_out = datetime.fromisoformat(verified["check_out"]) if verified["check_out"] else data.check_out
+
+        await self._ensure_within_flight_return(trip_id, check_out)
+
+        fields = {
+            "hotel_code": data.hotel_code,
+            "hotel_name": verified["hotel_name"],
+            "room_name": verified["room_name"],
+            "board_name": verified["board_name"],
+            "rate_key": data.rate_key,
+            "check_in": check_in,
+            "check_out": check_out,
+            "price": verified["price"],
+            "currency": verified["currency"],
+        }
 
         existing = await self._repo.get_by_trip_id(trip_id)
         if existing:
-            for key, val in data.model_dump().items():
+            for key, val in fields.items():
                 setattr(existing, key, val)
             await existing.save()
             return existing
 
-        booking = LodgingBooking(trip_id=trip_id, user_id=user_id, **data.model_dump())
+        booking = LodgingBooking(trip_id=trip_id, user_id=user_id, **fields)
         await booking.save()
         return booking
 
     async def get_lodging(self, trip_id: str, user_id: str) -> LodgingBooking:
         trip = await self._trip_repo.get_by_id(trip_id)
-        self._ensure_owner(trip, user_id)
+        ensure_trip_owner(trip, user_id)
 
         booking = await self._repo.get_by_trip_id(trip_id)
         if not booking:
@@ -119,16 +168,7 @@ class LodgingService:
         if not flight or not flight.return_date:
             return
 
-        # Mongo/Beanie devuelve datetimes naive (UTC); el request puede venir con tz-aware.
-        check_out_naive = check_out.replace(tzinfo=None) if check_out.tzinfo else check_out
-        return_date_naive = flight.return_date.replace(tzinfo=None) if flight.return_date.tzinfo else flight.return_date
-
-        if check_out_naive > return_date_naive:
+        if to_naive_utc(check_out) > to_naive_utc(flight.return_date):
             raise ValidationError(
                 "La fecha de salida del hospedaje no puede ser posterior a la fecha de regreso del vuelo"
             )
-
-    @staticmethod
-    def _ensure_owner(trip: Trip, user_id: str) -> None:
-        if trip.user_id != user_id:
-            raise ForbiddenError("You do not own this trip")

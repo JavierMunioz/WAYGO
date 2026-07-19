@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, status
 
+from app.core.exceptions import NotFoundError
 from app.dependencies.auth import CurrentUser
 from app.dependencies.pagination import PaginationParams
 from app.models.rating import Rating
 from app.models.user import User
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.rating_repository import RatingRepository
+from app.repositories.user_repository import UserRepository
 from app.repositories.visit_repository import VisitRepository
 from app.schemas.rating import CreateRatingRequest, RatingResponse
 from app.schemas.user import UserMiniResponse
@@ -20,8 +22,6 @@ def _get_service() -> RatingService:
 
 @router.get("", response_model=list[RatingResponse])
 async def get_ratings(place_id: str, pagination: PaginationParams = Depends()):
-    from app.repositories.user_repository import UserRepository
-
     svc = _get_service()
     ratings = await svc.get_place_ratings(place_id, pagination.page, pagination.page_size)
     user_repo = UserRepository()
@@ -29,9 +29,9 @@ async def get_ratings(place_id: str, pagination: PaginationParams = Depends()):
     for r in ratings:
         try:
             u = await user_repo.get_by_id(r.user_id)
-            result.append(_to_response(r, u))
-        except Exception:
-            continue
+        except NotFoundError:
+            continue  # orphaned rating — the user was deleted
+        result.append(_to_response(r, u))
     return result
 
 

@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, status
 
+from app.core.exceptions import NotFoundError
 from app.dependencies.auth import CurrentUser
 from app.dependencies.pagination import PaginationParams
 from app.repositories.comment_repository import CommentRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.photo_repository import PhotoRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.comment import CommentResponse, CreateCommentRequest, UpdateCommentRequest
 from app.schemas.user import UserMiniResponse
 from app.services.comment_service import CommentService
@@ -23,7 +25,6 @@ def _get_comment_service() -> CommentService:
 
 @router.get("", response_model=list[CommentResponse])
 async def get_comments(photo_id: str, pagination: PaginationParams = Depends()):
-    from app.repositories.user_repository import UserRepository
     svc = _get_comment_service()
     comments = await svc.get_photo_comments(photo_id, pagination.page, pagination.page_size)
     user_repo = UserRepository()
@@ -31,18 +32,18 @@ async def get_comments(photo_id: str, pagination: PaginationParams = Depends()):
     for c in comments:
         try:
             u = await user_repo.get_by_id(c.user_id)
-            result.append(
-                CommentResponse(
-                    id=str(c.id),
-                    photo_id=c.photo_id,
-                    content=c.content,
-                    created_at=c.created_at,
-                    updated_at=c.updated_at,
-                    user=UserMiniResponse(id=str(u.id), username=u.username, avatar_url=u.avatar_url, points=u.points),
-                )
+        except NotFoundError:
+            continue  # orphaned comment — the user was deleted
+        result.append(
+            CommentResponse(
+                id=str(c.id),
+                photo_id=c.photo_id,
+                content=c.content,
+                created_at=c.created_at,
+                updated_at=c.updated_at,
+                user=UserMiniResponse(id=str(u.id), username=u.username, avatar_url=u.avatar_url, points=u.points),
             )
-        except Exception:
-            pass
+        )
     return result
 
 

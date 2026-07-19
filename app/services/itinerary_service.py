@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
-from app.core.constants import PlaceCategory
-from app.core.exceptions import AlreadyExistsError, ForbiddenError, NotFoundError
+from app.core.constants import PlaceCategory, TripAvailability
+from app.core.exceptions import AlreadyExistsError, NotFoundError
 from app.models.itinerary import Itinerary, ItineraryBlock, ItineraryDay
 from app.models.place import Place
 from app.models.trip import Trip
@@ -10,11 +10,14 @@ from app.repositories.place_repository import PlaceRepository
 from app.repositories.trip_repository import TripRepository
 from app.schemas.itinerary import UpdateItineraryRequest
 from app.utils.geo import haversine_distance
+from app.utils.ownership import ensure_trip_owner
 
 # Curación por reglas: sin IA, sin costo externo. Usa lo que ya tenemos
 # (rating de la comunidad, categoría del lugar, cercanía geográfica).
-_MAX_BLOCKS_PER_DAY = 3
-_TIME_SLOTS = [("09:00", "11:00"), ("12:30", "14:30"), ("16:00", "18:00")]
+# Un viaje "tiempo parcial" (el usuario tiene otros compromisos, ej. trabajo)
+# recibe menos bloques y solo en horario nocturno.
+_FULL_TIME_SLOTS = [("09:00", "11:00"), ("12:30", "14:30"), ("16:00", "18:00")]
+_PART_TIME_SLOTS = [("18:00", "20:00")]
 
 _INTEREST_CATEGORY_MAP: dict[str, list[PlaceCategory]] = {
     "playa": [PlaceCategory.BEACH],
@@ -49,7 +52,7 @@ class ItineraryService:
 
     async def generate_for_trip(self, trip_id: str, user_id: str) -> Itinerary:
         trip = await self._trip_repo.get_by_id(trip_id)
-        self._ensure_owner(trip, user_id)
+        ensure_trip_owner(trip, user_id)
 
         existing = await self._repo.get_by_trip_id(trip_id)
         if existing:
@@ -62,7 +65,7 @@ class ItineraryService:
 
         candidates = await self._curate_places(trip)
         if candidates:
-            days = self._distribute_places(days, candidates)
+            days = self._distribute_places(days, candidates, trip.availability)
 
         itinerary = Itinerary(trip_id=trip_id, user_id=user_id, days=days)
         await itinerary.save()
@@ -70,7 +73,7 @@ class ItineraryService:
 
     async def get_by_trip(self, trip_id: str, user_id: str) -> Itinerary:
         trip = await self._trip_repo.get_by_id(trip_id)
-        self._ensure_owner(trip, user_id)
+        ensure_trip_owner(trip, user_id)
 
         itinerary = await self._repo.get_by_trip_id(trip_id)
         if not itinerary:
@@ -110,20 +113,24 @@ class ItineraryService:
 
         return sorted(places, key=score, reverse=True)
 
-    def _distribute_places(self, days: list[ItineraryDay], candidates: list[Place]) -> list[ItineraryDay]:
+    def _distribute_places(
+        self, days: list[ItineraryDay], candidates: list[Place], availability: TripAvailability
+    ) -> list[ItineraryDay]:
+        time_slots = _PART_TIME_SLOTS if availability == TripAvailability.PART_TIME else _FULL_TIME_SLOTS
+        max_per_day = len(time_slots)
         remaining = list(candidates)
 
         for day in days:
             if not remaining:
                 break
 
-            picks = remaining[:_MAX_BLOCKS_PER_DAY]
-            remaining = remaining[_MAX_BLOCKS_PER_DAY:]
+            picks = remaining[:max_per_day]
+            remaining = remaining[max_per_day:]
             ordered = self._order_by_proximity(picks)
 
             blocks = []
             for i, place in enumerate(ordered):
-                start, end = _TIME_SLOTS[i] if i < len(_TIME_SLOTS) else (None, None)
+                start, end = time_slots[i] if i < len(time_slots) else (None, None)
                 blocks.append(
                     ItineraryBlock(
                         order=i,
@@ -157,8 +164,3 @@ class ItineraryService:
             route.append(nearest)
             remaining.remove(nearest)
         return route
-
-    @staticmethod
-    def _ensure_owner(trip: Trip, user_id: str) -> None:
-        if trip.user_id != user_id:
-            raise ForbiddenError("You do not own this trip")

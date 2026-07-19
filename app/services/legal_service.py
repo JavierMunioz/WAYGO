@@ -58,12 +58,12 @@ class LegalService:
         request: ConsentRequest,
         ip_address: str | None,
     ) -> None:
-        from app.core.exceptions import BadRequestError
+        from app.core.exceptions import ValidationError
 
         for item in request.consents:
             doc = await self._docs.get_by_id(item.document_id)
             if not doc or doc.doc_type != item.doc_type or doc.version != item.doc_version:
-                raise BadRequestError(f"Invalid document reference: {item.document_id}")
+                raise ValidationError(f"Invalid document reference: {item.document_id}")
 
             existing = await self._consents.get_user_consent_for_doc(
                 user_id, item.doc_type, item.doc_version

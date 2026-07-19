@@ -9,6 +9,7 @@ from app.repositories.itinerary_repository import ItineraryRepository
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.trip_repository import TripRepository
 from app.schemas.itinerary import UpdateItineraryRequest
+from app.services.osm_import_service import OsmImportService
 from app.utils.geo import haversine_distance
 from app.utils.ownership import ensure_trip_owner
 
@@ -96,6 +97,16 @@ class ItineraryService:
         places = await self._place_repo.find_by_country_and_city(
             trip.destination_country, trip.destination_city, limit=200
         )
+        if not places:
+            # Ciudad sin lugares cacheados todavía — importamos desde
+            # OpenStreetMap una sola vez (gratis) y reintentamos.
+            imported = await OsmImportService(self._place_repo).import_places_for_city(
+                trip.destination_city, trip.destination_country
+            )
+            if imported:
+                places = await self._place_repo.find_by_country_and_city(
+                    trip.destination_country, trip.destination_city, limit=200
+                )
         if not places:
             return []
 

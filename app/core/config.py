@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     DUFFEL_API_BASE_URL: str = "https://api.duffel.com"
     DUFFEL_VERSION: str = "v2"
 
+    # Lodging (Hotelbeds API — https://developer.hotelbeds.com)
+    HOTELBEDS_API_KEY: str = "YOUR_HOTELBEDS_API_KEY_HERE"
+    HOTELBEDS_SECRET: str = "YOUR_HOTELBEDS_SECRET_HERE"
+    HOTELBEDS_API_BASE_URL: str = "https://api.test.hotelbeds.com"
+
     # Sentry
     SENTRY_DSN: str = ""
 

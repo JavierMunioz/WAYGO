@@ -6,6 +6,7 @@ from app.models.flight_booking import FlightBooking
 from app.models.follow import Follow
 from app.models.itinerary import Itinerary
 from app.models.legal import LegalDocument, UserConsent
+from app.models.lodging_booking import LodgingBooking
 from app.models.notification import Notification
 from app.models.otp_code import OTPCode
 from app.models.photo import Photo, PhotoLike, PhotoSave
@@ -23,6 +24,7 @@ BEANIE_DOCUMENT_MODELS = [
     Trip,
     Itinerary,
     FlightBooking,
+    LodgingBooking,
     Visit,
     Photo,
     PhotoLike,
@@ -49,6 +51,7 @@ __all__ = [
     "Trip",
     "Itinerary",
     "FlightBooking",
+    "LodgingBooking",
     "Visit",
     "Photo",
     "PhotoLike",

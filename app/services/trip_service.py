@@ -43,7 +43,11 @@ class TripService:
         for key, val in update_data.items():
             setattr(trip, key, val)
 
-        if trip.end_date < trip.start_date:
+        # Mongo/Beanie devuelve datetimes naive (UTC); un PATCH parcial puede
+        # dejar un campo aware (del request) junto a otro naive (de la DB).
+        end_date = trip.end_date.replace(tzinfo=None) if trip.end_date.tzinfo else trip.end_date
+        start_date = trip.start_date.replace(tzinfo=None) if trip.start_date.tzinfo else trip.start_date
+        if end_date < start_date:
             raise ValidationError("end_date must be on or after start_date")
 
         trip.updated_at = datetime.now(UTC)

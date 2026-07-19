@@ -35,6 +35,8 @@ class Place(Document):
     total_visits: int = 0
     total_photos: int = 0
     total_likes: int = 0
+    average_rating: float = 0.0
+    rating_count: int = 0
     is_active: bool = True
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -11,6 +11,7 @@ from app.models.notification import Notification
 from app.models.otp_code import OTPCode
 from app.models.photo import Photo, PhotoLike, PhotoSave
 from app.models.place import Place
+from app.models.rating import Rating
 from app.models.trip import Trip
 from app.models.user import RefreshToken, User
 from app.models.user_stats import UserStats
@@ -41,6 +42,7 @@ BEANIE_DOCUMENT_MODELS = [
     OTPCode,
     LegalDocument,
     UserConsent,
+    Rating,
 ]
 
 __all__ = [
@@ -68,5 +70,6 @@ __all__ = [
     "OTPCode",
     "LegalDocument",
     "UserConsent",
+    "Rating",
     "BEANIE_DOCUMENT_MODELS",
 ]

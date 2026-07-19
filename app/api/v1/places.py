@@ -83,6 +83,8 @@ async def get_nearby_places(
             total_visits=p.get("total_visits", 0),
             total_photos=p.get("total_photos", 0),
             total_likes=p.get("total_likes", 0),
+            average_rating=p.get("average_rating", 0.0),
+            rating_count=p.get("rating_count", 0),
             distance_meters=round(p.get("distance_meters", 0), 1),
         )
         for p in raw
@@ -176,4 +178,6 @@ def _to_response(place) -> PlaceResponse:
         total_visits=place.total_visits,
         total_photos=place.total_photos,
         total_likes=place.total_likes,
+        average_rating=place.average_rating,
+        rating_count=place.rating_count,
     )

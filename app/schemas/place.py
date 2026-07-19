@@ -28,6 +28,8 @@ class PlaceResponse(BaseSchema):
     total_visits: int
     total_photos: int
     total_likes: int
+    average_rating: float = 0.0
+    rating_count: int = 0
 
 
 class PlaceDetailResponse(PlaceResponse):

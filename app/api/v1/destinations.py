@@ -79,6 +79,8 @@ async def get_destination_places(destination_id: str, pagination: PaginationPara
             total_visits=p.total_visits,
             total_photos=p.total_photos,
             total_likes=p.total_likes,
+            average_rating=p.average_rating,
+            rating_count=p.rating_count,
         )
         for p in places
     ]

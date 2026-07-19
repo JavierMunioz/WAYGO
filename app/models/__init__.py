@@ -4,6 +4,7 @@ from app.models.comment import Comment
 from app.models.destination import Destination
 from app.models.flight_booking import FlightBooking
 from app.models.follow import Follow
+from app.models.hotelbeds_destination import HotelbedsDestination
 from app.models.itinerary import Itinerary
 from app.models.legal import LegalDocument, UserConsent
 from app.models.lodging_booking import LodgingBooking
@@ -26,6 +27,7 @@ BEANIE_DOCUMENT_MODELS = [
     Itinerary,
     FlightBooking,
     LodgingBooking,
+    HotelbedsDestination,
     Visit,
     Photo,
     PhotoLike,
@@ -54,6 +56,7 @@ __all__ = [
     "Itinerary",
     "FlightBooking",
     "LodgingBooking",
+    "HotelbedsDestination",
     "Visit",
     "Photo",
     "PhotoLike",

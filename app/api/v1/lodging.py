@@ -5,16 +5,32 @@ from fastapi import APIRouter, Query, status
 from app.dependencies.auth import CurrentUser
 from app.models.lodging_booking import LodgingBooking
 from app.repositories.flight_booking_repository import FlightBookingRepository
+from app.repositories.hotelbeds_destination_repository import HotelbedsDestinationRepository
 from app.repositories.lodging_booking_repository import LodgingBookingRepository
 from app.repositories.trip_repository import TripRepository
-from app.schemas.lodging import HotelOffer, LodgingBookingResponse, LodgingSearchRequest, SaveLodgingRequest
+from app.schemas.lodging import (
+    DestinationSuggestion,
+    HotelOffer,
+    LodgingBookingResponse,
+    LodgingSearchRequest,
+    SaveLodgingRequest,
+)
+from app.services.hotelbeds_destination_service import HotelbedsDestinationService
 from app.services.lodging_service import LodgingService
 
 router = APIRouter(prefix="/trips/{trip_id}/lodging", tags=["Lodging"])
+destinations_router = APIRouter(prefix="/lodging/destinations", tags=["Lodging"])
 
 
 def _get_service() -> LodgingService:
     return LodgingService(LodgingBookingRepository(), TripRepository(), FlightBookingRepository())
+
+
+@destinations_router.get("", response_model=list[DestinationSuggestion])
+async def search_destinations(current_user: CurrentUser, q: str = Query(..., min_length=2, max_length=60)):
+    svc = HotelbedsDestinationService(HotelbedsDestinationRepository())
+    results = await svc.search(q)
+    return [DestinationSuggestion(code=d.code, name=d.name, country_code=d.country_code) for d in results]
 
 
 @router.get("/search", response_model=list[HotelOffer])

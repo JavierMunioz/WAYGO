@@ -5,6 +5,12 @@ from pydantic import Field
 from app.schemas.common import BaseSchema
 
 
+class DestinationSuggestion(BaseSchema):
+    code: str
+    name: str
+    country_code: str
+
+
 class LodgingSearchRequest(BaseSchema):
     destination_code: str = Field(min_length=2, max_length=10, description="Código de destino Hotelbeds, ej. PMI")
     check_in: datetime

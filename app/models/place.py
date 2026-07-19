@@ -26,6 +26,11 @@ class Place(Document):
     validation_radius: float = 30.0  # meters
     location: dict  # GeoJSON Point: {"type": "Point", "coordinates": [lng, lat]}
 
+    # Ficha enriquecida (contenido curado para itinerarios)
+    opening_hours: str | None = None  # texto libre, ej. "Lun-Vie 9:00-18:00"
+    price_range: str | None = None  # texto libre, ej. "Gratis" / "$10.000 - $20.000 COP"
+    fun_fact: str | None = None  # historia o dato curioso del lugar
+
     # Denormalized counters
     total_visits: int = 0
     total_photos: int = 0

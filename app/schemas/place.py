@@ -22,6 +22,9 @@ class PlaceResponse(BaseSchema):
     cover_image: str | None = None
     validation_radius: float
     location: GeoPointSchema
+    opening_hours: str | None = None
+    price_range: str | None = None
+    fun_fact: str | None = None
     total_visits: int
     total_photos: int
     total_likes: int
@@ -45,6 +48,9 @@ class CreatePlaceRequest(BaseSchema):
     validation_radius: float = Field(default=30.0, ge=10.0, le=500.0)
     longitude: float = Field(ge=-180, le=180)
     latitude: float = Field(ge=-90, le=90)
+    opening_hours: str | None = Field(None, max_length=200)
+    price_range: str | None = Field(None, max_length=100)
+    fun_fact: str | None = Field(None, max_length=1000)
 
 
 class UpdatePlaceRequest(BaseSchema):
@@ -53,3 +59,6 @@ class UpdatePlaceRequest(BaseSchema):
     cover_image: str | None = None
     validation_radius: float | None = Field(None, ge=10.0, le=500.0)
     category: PlaceCategory | None = None
+    opening_hours: str | None = Field(None, max_length=200)
+    price_range: str | None = Field(None, max_length=100)
+    fun_fact: str | None = Field(None, max_length=1000)

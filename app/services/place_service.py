@@ -30,6 +30,9 @@ class PlaceService:
             cover_image=data.cover_image,
             validation_radius=data.validation_radius,
             location={"type": "Point", "coordinates": [data.longitude, data.latitude]},
+            opening_hours=data.opening_hours,
+            price_range=data.price_range,
+            fun_fact=data.fun_fact,
         )
         await place.save()
         return place

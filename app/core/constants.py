@@ -48,6 +48,19 @@ class RankingScope(StrEnum):
     CITY = "city"
 
 
+class TripStatus(StrEnum):
+    DRAFT = "draft"
+    PLANNED = "planned"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class TripAvailability(StrEnum):
+    FULL_TIME = "full_time"  # solo turismo, todo el dia disponible
+    PART_TIME = "part_time"  # tiempo parcial, ej. viaje con compromisos
+
+
 class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"

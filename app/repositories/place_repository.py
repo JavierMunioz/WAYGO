@@ -60,6 +60,17 @@ class PlaceRepository(BaseRepository[Place]):
             .to_list()
         )
 
+    async def find_by_country_and_city(
+        self, country: str, city: str, skip: int = 0, limit: int = 20
+    ) -> list[Place]:
+        return (
+            await Place.find(Place.country == country, Place.city == city, Place.is_active == True)
+            .sort(-Place.total_visits)
+            .skip(skip)
+            .limit(limit)
+            .to_list()
+        )
+
     async def find_by_city(self, city: str, skip: int = 0, limit: int = 20) -> list[Place]:
         return (
             await Place.find(Place.city == city, Place.is_active == True)

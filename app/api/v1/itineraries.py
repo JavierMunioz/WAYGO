@@ -3,6 +3,7 @@ from fastapi import APIRouter, status
 from app.dependencies.auth import CurrentUser
 from app.models.itinerary import Itinerary
 from app.repositories.itinerary_repository import ItineraryRepository
+from app.repositories.place_repository import PlaceRepository
 from app.repositories.trip_repository import TripRepository
 from app.schemas.itinerary import ItineraryResponse, UpdateItineraryRequest
 from app.services.itinerary_service import ItineraryService
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/trips/{trip_id}/itinerary", tags=["Itinerary"])
 
 
 def _get_service() -> ItineraryService:
-    return ItineraryService(ItineraryRepository(), TripRepository())
+    return ItineraryService(ItineraryRepository(), TripRepository(), PlaceRepository())
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ItineraryResponse)

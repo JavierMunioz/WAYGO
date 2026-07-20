@@ -170,7 +170,7 @@ class LodgingService:
                     "paxes": [{"roomId": 1, "type": "AD", "name": holder_name, "surname": holder_surname}],
                 }
             ],
-            "clientReference": f"waygo-{trip_id}",
+            "clientReference": f"wg-{trip_id[-16:]}",  # Hotelbeds exige máximo 20 caracteres
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:

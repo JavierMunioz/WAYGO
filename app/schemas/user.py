@@ -7,6 +7,7 @@ from app.schemas.common import BaseSchema
 
 _ALLOWED_AVATAR_SCHEMES = {"https"}
 _ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+SUPPORTED_CURRENCIES = {"USD", "EUR", "GBP", "COP", "MXN", "ARS", "BRL", "CLP", "PEN"}
 
 
 def _validate_avatar_url(v: str | None) -> str | None:
@@ -42,6 +43,7 @@ class UserProfileResponse(UserPublicResponse):
     is_following: bool = False
     rank_global: int | None = None
     is_superuser: bool = False
+    preferred_currency: str = "USD"
 
 
 class UpdateProfileRequest(BaseSchema):
@@ -50,11 +52,22 @@ class UpdateProfileRequest(BaseSchema):
     country: str | None = None
     city: str | None = None
     avatar_url: str | None = None
+    preferred_currency: str | None = None
 
     @field_validator("avatar_url")
     @classmethod
     def validate_avatar_url(cls, v: str | None) -> str | None:
         return _validate_avatar_url(v)
+
+    @field_validator("preferred_currency")
+    @classmethod
+    def validate_preferred_currency(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.upper()
+        if v not in SUPPORTED_CURRENCIES:
+            raise ValueError(f"Unsupported currency: {v}")
+        return v
 
 
 class UserMiniResponse(BaseSchema):

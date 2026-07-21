@@ -48,6 +48,7 @@ class UserService:
             is_following=is_following,
             rank_global=rank,
             is_superuser=user.is_superuser,
+            preferred_currency=user.preferred_currency,
         )
 
     async def update_profile(self, user_id: str, data: UpdateProfileRequest) -> User:

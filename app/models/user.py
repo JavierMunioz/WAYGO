@@ -13,6 +13,7 @@ class User(Document):
     bio: str | None = None
     country: str | None = None
     city: str | None = None
+    preferred_currency: str = "USD"
     is_email_verified: bool = False
     is_active: bool = True
     is_superuser: bool = False

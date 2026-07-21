@@ -20,6 +20,7 @@ class PlaceResponse(BaseSchema):
     city: str
     category: PlaceCategory
     cover_image: str | None = None
+    cover_image_source: str | None = None  # "real" | "stock" | None
     validation_radius: float
     location: GeoPointSchema
     opening_hours: str | None = None

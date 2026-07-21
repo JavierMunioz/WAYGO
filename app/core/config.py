@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     HOTELBEDS_SECRET: str = "YOUR_HOTELBEDS_SECRET_HERE"
     HOTELBEDS_API_BASE_URL: str = "https://api.test.hotelbeds.com"
 
+    # Foto de relleno (stock) para lugares sin foto real de Wikimedia — opcional,
+    # si queda vacío simplemente no se rellenan esos lugares con stock.
+    UNSPLASH_ACCESS_KEY: str = ""
+
     # Sentry
     SENTRY_DSN: str = ""
 

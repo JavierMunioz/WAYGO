@@ -75,6 +75,7 @@ async def get_nearby_places(
             city=p["city"],
             category=p["category"],
             cover_image=p.get("cover_image"),
+            cover_image_source=p.get("cover_image_source"),
             validation_radius=p["validation_radius"],
             location=p["location"],
             opening_hours=p.get("opening_hours"),
@@ -167,6 +168,7 @@ def _to_response(place) -> PlaceResponse:
         city=place.city,
         category=place.category,
         cover_image=place.cover_image,
+        cover_image_source=place.cover_image_source,
         validation_radius=place.validation_radius,
         location=GeoPointSchema(
             type=place.location["type"],

@@ -23,6 +23,10 @@ class Place(Document):
     city: Annotated[str, Indexed()]
     category: Annotated[PlaceCategory, Indexed()]
     cover_image: str | None = None
+    # "real" = foto auténtica del lugar (Wikimedia/Wikipedia); "stock" = foto
+    # genérica de relleno por categoría (Unsplash) — el frontend usa esto para
+    # no hacer pasar una foto genérica como si fuera del lugar real.
+    cover_image_source: str | None = None
     validation_radius: float = 30.0  # meters
     location: dict  # GeoJSON Point: {"type": "Point", "coordinates": [lng, lat]}
 

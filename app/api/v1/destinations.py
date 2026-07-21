@@ -71,6 +71,7 @@ async def get_destination_places(destination_id: str, pagination: PaginationPara
             city=p.city,
             category=p.category,
             cover_image=p.cover_image,
+            cover_image_source=p.cover_image_source,
             validation_radius=p.validation_radius,
             location=GeoPointSchema(type=p.location["type"], coordinates=p.location["coordinates"]),
             opening_hours=p.opening_hours,
